@@ -1,9 +1,9 @@
-
 from flask import Flask, request, jsonify
 import asyncio
 import logging
 from bot import FTMBot
 from telegram import Update
+from threading import Thread
 
 # Configure logging
 logging.basicConfig(
@@ -26,7 +26,7 @@ def index():
         "version": "2.0",
         "features": [
             "Music ID Processing",
-            "Album ID Processing", 
+            "Album ID Processing",
             "URL Processing",
             "File Upload Support",
             "Progress Tracking",
@@ -45,10 +45,13 @@ def webhook():
         # Get update from Telegram
         json_data = request.get_json(force=True)
         update = Update.de_json(json_data, bot.application.bot)
-        
-        # Process update asynchronously
-        asyncio.create_task(bot.application.process_update(update))
-        
+
+        # Schedule async processing safely
+        asyncio.run_coroutine_threadsafe(
+            bot.application.process_update(update),
+            bot.loop
+        )
+
         return jsonify({"ok": True})
     except Exception as e:
         logger.error(f"Webhook error: {e}")
@@ -76,30 +79,26 @@ def stats():
 async def initialize_bot():
     """Initialize bot application"""
     try:
-        # Setup bot application
         bot.setup_bot_application()
-        
-        # Initialize the application
         await bot.application.initialize()
-        
-        # Send startup notification
         await bot.send_startup_notification_async()
-        
         logger.info("Bot initialized successfully")
     except Exception as e:
         logger.error(f"Failed to initialize bot: {e}")
 
+def run_bot_loop():
+    """Run asyncio loop for the bot in separate thread"""
+    bot.loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(bot.loop)
+    bot.loop.run_until_complete(initialize_bot())
+    bot.loop.run_forever()
+
 if __name__ == "__main__":
-    # Initialize bot in background
-    asyncio.create_task(initialize_bot())
-    
+    # Start bot loop in background thread
+    Thread(target=run_bot_loop, daemon=True).start()
+
     logger.info("FTM Professional Bot v2.0 Web Server starting...")
     logger.info("Server running on http://0.0.0.0:5000")
-    
-    # Run Flask app
-    try:
-        app.run(host='0.0.0.0', port=5000, debug=False)
-    except KeyboardInterrupt:
-        logger.info("Server stopped by user")
-    except Exception as e:
-        logger.error(f"Server stopped due to error: {e}")
+
+    # Run Flask app (sync)
+    app.run(host='0.0.0.0', port=5000, debug=False)
