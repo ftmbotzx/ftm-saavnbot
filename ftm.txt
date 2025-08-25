@@ -1,0 +1,8 @@
+# Python Telegram Bot with all optional extras
+python-telegram-bot[all]==22.3
+
+# HTTP client library
+requests==2.32.3
+
+# Web framework (for webhooks, APIs, dashboards)
+Flask==3.0.3
