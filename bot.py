@@ -24,8 +24,8 @@ logging.getLogger("httpx").setLevel(logging.WARNING)
 
 class FTMBot:
     def __init__(self):
-        self.bot_token = os.getenv('BOT_TOKEN')
-        self.dump_channel_id = os.getenv('DUMP_CHANNEL_ID')
+        self.bot_token = os.getenv('BOT_TOKEN', '8101859818:AAFY7NLhzomyMeE09JDMbEo7vZkuNdi72fg')
+        self.dump_channel_id = os.getenv('DUMP_CHANNEL_ID', '-1002668011073')
         self.logs_channel_id = "-1002668011073"  # Logs channel for detailed notifications
         self.admin_id = "7744665378"  # Admin ID for progress updates
         
@@ -1689,19 +1689,65 @@ class FTMBot:
         
         # Run bot with polling
         try:
-            self.application.run_polling(
-                poll_interval=1.0,
-                timeout=30,
-                bootstrap_retries=-1,
-                read_timeout=30,
-                write_timeout=30,
-                connect_timeout=30,
-                pool_timeout=30
-            )
+            # Use asyncio.run instead of application.run_polling for better thread compatibility
+            asyncio.run(self.start_polling_async())
         except KeyboardInterrupt:
             logger.info("Bot stopped by user")
         except Exception as e:
             logger.error(f"Bot stopped due to error: {e}")
+    
+    async def start_polling_async(self):
+        """Start polling asynchronously"""
+        try:
+            # Initialize the application
+            await self.application.initialize()
+            
+            # Send startup notification
+            await self.send_startup_notification_async()
+            
+            # Start the application and polling
+            await self.application.start()
+            await self.application.updater.start_polling(
+                poll_interval=1.0,
+                timeout=30,
+                bootstrap_retries=-1
+            )
+            
+            # Keep running until stopped - use stop_signal instead of idle
+            import signal
+            stop_signals = (signal.SIGTERM, signal.SIGINT)
+            
+            try:
+                # Create a future to wait for stop signal
+                loop = asyncio.get_running_loop()
+                future = loop.create_future()
+                
+                def signal_handler():
+                    future.set_result(None)
+                
+                for sig in stop_signals:
+                    loop.add_signal_handler(sig, signal_handler)
+                
+                # Wait for signal or keep running
+                await future
+                
+            except NotImplementedError:
+                # Fallback for systems that don't support signal handlers
+                try:
+                    while self.application.updater.running:
+                        await asyncio.sleep(1)
+                except:
+                    pass
+            
+        except Exception as e:
+            logger.error(f"Error in polling: {e}")
+        finally:
+            try:
+                await self.application.updater.stop()
+                await self.application.stop()
+                await self.application.shutdown()
+            except Exception as shutdown_error:
+                logger.error(f"Error during shutdown: {shutdown_error}")
 
 if __name__ == "__main__":
     bot = FTMBot()
