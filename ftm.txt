@@ -1,8 +1,5 @@
-# Python Telegram Bot with all optional extras
-python-telegram-bot[all]==22.3
-
-# HTTP client library
-requests==2.32.3
-
-# Web framework (for webhooks, APIs, dashboards)
-Flask==3.0.3
+python-telegram-bot>=22.3
+requests>=2.31.0
+mutagen>=1.46.0
+pydub>=0.25.1
+flask>=3.1.2
